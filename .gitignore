@@ -63,3 +63,4 @@ sample_scripts
 **/train_results/
 **/src/*data*
 **/lib/weights
+**/extracted_dict.pickle
