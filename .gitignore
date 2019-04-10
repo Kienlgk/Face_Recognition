@@ -64,3 +64,4 @@ sample_scripts
 **/src/*data*
 **/lib/weights
 **/extracted_dict.pickle
+**/ckpt

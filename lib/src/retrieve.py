@@ -70,72 +70,72 @@ args = parser.parse_args()
 
 def align_face(img,pnet, rnet, onet):
 
-		        minsize = 20 # minimum size of face
-		        threshold = [ 0.6, 0.7, 0.7 ]  # three steps's threshold
-		        factor = 0.709 # scale factor
+    minsize = 20 # minimum size of face
+    threshold = [ 0.6, 0.7, 0.7 ]  # three steps's threshold
+    factor = 0.709 # scale factor
 
-                        print("before img.size == 0")	
-                        if img.size == 0:
-                                print("empty array")
-				return False,img,[0,0,0,0]
+    print("before img.size == 0")	
+    if img.size == 0:
+        print("empty array")
+        return False,img,[0,0,0,0]
 
-                        if img.ndim<2:
-                            print('Unable to align')
+    if img.ndim<2:
+        print('Unable to align')
 
-                        if img.ndim == 2:
-                            img = to_rgb(img)
+    if img.ndim == 2:
+        img = to_rgb(img)
 
-                        img = img[:,:,0:3]
-	
-			bounding_boxes, _ = detect_face.detect_face(img, minsize, pnet, rnet, onet, threshold, factor)
+    img = img[:,:,0:3]
 
-                        nrof_faces = bounding_boxes.shape[0]
+    bounding_boxes, _ = detect_face.detect_face(img, minsize, pnet, rnet, onet, threshold, factor)
 
-                        
-                        if nrof_faces==0:
-                            return False,img,[0,0,0,0]
-                        else:
-                            det = bounding_boxes[:,0:4]
-                            det_arr = []
-                            img_size = np.asarray(img.shape)[0:2]
-                            if nrof_faces>1:
-                                if args.detect_multiple_faces:
-                                    for i in range(nrof_faces):
-                                        det_arr.append(np.squeeze(det[i]))
-                                else:
-                                    bounding_box_size = (det[:,2]-det[:,0])*(det[:,3]-det[:,1])
-                                    img_center = img_size / 2
-                                    offsets = np.vstack([ (det[:,0]+det[:,2])/2-img_center[1], (det[:,1]+det[:,3])/2-img_center[0] ])
-                                    offset_dist_squared = np.sum(np.power(offsets,2.0),0)
-                                    index = np.argmax(bounding_box_size-offset_dist_squared*2.0) # some extra weight on the centering
-                                    det_arr.append(det[index,:])
-                            else:
-                                det_arr.append(np.squeeze(det))
-                            if len(det_arr)>0:
-                                    faces = []
-                                    bboxes = []
-		                    for i, det in enumerate(det_arr):
-		                        det = np.squeeze(det)
-		                        bb = np.zeros(4, dtype=np.int32)
-		                        bb[0] = np.maximum(det[0]-args.margin/2, 0)
-		                        bb[1] = np.maximum(det[1]-args.margin/2, 0)
-		                        bb[2] = np.minimum(det[2]+args.margin/2, img_size[1])
-		                        bb[3] = np.minimum(det[3]+args.margin/2, img_size[0])
-		                        cropped = img[bb[1]:bb[3],bb[0]:bb[2],:]
-		                        scaled = misc.imresize(cropped, (args.image_size, args.image_size), interp='bilinear')
-		                        misc.imsave("cropped.png", scaled)
-                                        faces.append(scaled)
-                                        bboxes.append(bb)
-		                        print("leaving align face")
-		                    return True,faces,bboxes
-			
+    nrof_faces = bounding_boxes.shape[0]
+
+            
+    if nrof_faces==0:
+        return False,img,[0,0,0,0]
+    else:
+        det = bounding_boxes[:,0:4]
+        det_arr = []
+        img_size = np.asarray(img.shape)[0:2]
+        if nrof_faces>1:
+            if args.detect_multiple_faces:
+                for i in range(nrof_faces):
+                    det_arr.append(np.squeeze(det[i]))
+            else:
+                bounding_box_size = (det[:,2]-det[:,0])*(det[:,3]-det[:,1])
+                img_center = img_size / 2
+                offsets = np.vstack([ (det[:,0]+det[:,2])/2-img_center[1], (det[:,1]+det[:,3])/2-img_center[0] ])
+                offset_dist_squared = np.sum(np.power(offsets,2.0),0)
+                index = np.argmax(bounding_box_size-offset_dist_squared*2.0) # some extra weight on the centering
+                det_arr.append(det[index,:])
+        else:
+            det_arr.append(np.squeeze(det))
+        if len(det_arr)>0:
+                faces = []
+                bboxes = []
+        for i, det in enumerate(det_arr):
+            det = np.squeeze(det)
+            bb = np.zeros(4, dtype=np.int32)
+            bb[0] = np.maximum(det[0]-args.margin/2, 0)
+            bb[1] = np.maximum(det[1]-args.margin/2, 0)
+            bb[2] = np.minimum(det[2]+args.margin/2, img_size[1])
+            bb[3] = np.minimum(det[3]+args.margin/2, img_size[0])
+            cropped = img[bb[1]:bb[3],bb[0]:bb[2],:]
+            scaled = misc.imresize(cropped, (args.image_size, args.image_size), interp='bilinear')
+            misc.imsave("cropped.png", scaled)
+            faces.append(scaled)
+            bboxes.append(bb)
+            print("leaving align face")
+        return True,faces,bboxes
+
 
 def identify_person(image_vector, feature_array, k=9):
-	    top_k_ind = np.argsort([np.linalg.norm(image_vector-pred_row) \
-                            for ith_row, pred_row in enumerate(feature_array.values())])[:k]
-            result = feature_array.keys()[top_k_ind[0]]
-            acc = np.linalg.norm(image_vector-feature_array.values()[top_k_ind[0]])
-            return result, acc
+    top_k_ind = np.argsort([np.linalg.norm(image_vector-pred_row) \
+                        for ith_row, pred_row in enumerate(feature_array.values())])[:k]
+    result = feature_array.keys()[top_k_ind[0]]
+    acc = np.linalg.norm(image_vector-feature_array.values()[top_k_ind[0]])
+    return result, acc
 
 
 def recognize_face(sess,pnet, rnet, onet,feature_array):

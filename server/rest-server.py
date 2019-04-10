@@ -20,6 +20,7 @@ from lib.src import retrieve
 from lib.src.align import detect_face
 import tensorflow as tf
 import pickle
+import time
 from tensorflow.python.platform import gfile
 app = Flask(__name__, static_url_path = "")
 
@@ -34,13 +35,19 @@ auth = HTTPBasicAuth()
 with open('../lib/src/face_embeddings.pickle','rb') as f:
 					    	feature_array = pickle.load(f) 
 
-model_exp = '../lib/src/ckpt/20170512-110547'
+model_exp = '../lib/src/ckpt/20180402-114759'
 graph_fr = tf.Graph()
-sess_fr = tf.Session(graph=graph_fr)
+# Config memory for GTX 1080 with 8GB VRAM
+gpu_memory_fraction = 0.4
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
+sess_fr = tf.Session(graph=graph_fr, config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
 with graph_fr.as_default():
-	saverf = tf.train.import_meta_graph(os.path.join(model_exp, 'model-20170512-110547.meta'))
-	saverf.restore(sess_fr, os.path.join(model_exp, 'model-20170512-110547.ckpt-250000'))
+	saverf = tf.train.import_meta_graph(os.path.join(model_exp, 'model-20180402-114759.meta'))
+	saverf.restore(sess_fr, os.path.join(model_exp, 'model-20180402-114759.ckpt-275'))
 	pnet, rnet, onet = detect_face.create_mtcnn(sess_fr, None)
+	print("start sleeping")
+	time.sleep(10)
+
 #==============================================================================================================================
 #                                                                                                                              
 #  This function is used to do the face recognition from video camera                                                          

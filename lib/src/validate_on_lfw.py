@@ -93,16 +93,16 @@ def main(args):
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('lfw_dir', type=str, default='/home/gpuuser/vinayak/models/facenet/src/datasets/kar_Vin_aligned',
+    parser.add_argument('lfw_dir', type=str, default='/media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/data_160x160',
         help='Path to the data directory containing aligned LFW face patches.')
     parser.add_argument('--lfw_batch_size', type=int,
         help='Number of images to process in a batch in the LFW test set.', default=100)
-    parser.add_argument('model', type=str, default='/home/gpuuser/vinayak/models/facenet/src/ckpt/20170512-110547', 
+    parser.add_argument('model', type=str, default='/media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/ckpt/20180402-114759', 
         help='Could be either a directory containing the meta_file and ckpt_file or a model protobuf (.pb) file')
     parser.add_argument('--image_size', type=int,
         help='Image size (height, width) in pixels.', default=160)
     parser.add_argument('--lfw_pairs', type=str,
-        help='The file containing the pairs to use for validation.', default='data/pairs.txt')
+        help='The file containing the pairs to use for validation.', default='generated_pairs.txt')
     parser.add_argument('--lfw_file_ext', type=str,
         help='The file extension for the LFW dataset.', default='png', choices=['jpg', 'png'])
     parser.add_argument('--lfw_nrof_folds', type=int,
