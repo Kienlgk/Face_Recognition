@@ -52,7 +52,8 @@ def main(args):
 
             # Get the paths for the corresponding images
             paths, actual_issame = lfw.get_paths(os.path.expanduser(args.lfw_dir), pairs, args.lfw_file_ext)
-
+            # print(len(actual_issame))
+            # exit()
             # Load the model
             facenet.load_model(args.model)
             
@@ -78,7 +79,7 @@ def main(args):
                 images = facenet.load_data(paths_batch, False, False, image_size)
                 feed_dict = { images_placeholder:images, phase_train_placeholder:False }
                 emb_array[start_index:end_index,:] = sess.run(embeddings, feed_dict=feed_dict)
-        
+            
             tpr, fpr, accuracy, val, val_std, far = lfw.evaluate(emb_array, 
                 actual_issame, nrof_folds=args.lfw_nrof_folds)
 
@@ -87,8 +88,8 @@ def main(args):
 
             auc = metrics.auc(fpr, tpr)
             print('Area Under Curve (AUC): %1.3f' % auc)
-            eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
-            print('Equal Error Rate (EER): %1.3f' % eer)
+            # eer = brentq(lambda x: 1. - x - interpolate.interp1d(fpr, tpr)(x), 0., 1.)
+            # print('Equal Error Rate (EER): %1.3f' % eer)
             
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
@@ -102,7 +103,7 @@ def parse_arguments(argv):
     parser.add_argument('--image_size', type=int,
         help='Image size (height, width) in pixels.', default=160)
     parser.add_argument('--lfw_pairs', type=str,
-        help='The file containing the pairs to use for validation.', default='generated_pairs.txt')
+        help='The file containing the pairs to use for validation.', default='pairs.txt')
     parser.add_argument('--lfw_file_ext', type=str,
         help='The file extension for the LFW dataset.', default='png', choices=['jpg', 'png'])
     parser.add_argument('--lfw_nrof_folds', type=int,

@@ -124,7 +124,9 @@ def main(args):
                                 cropped = img[bb[1]:bb[3],bb[0]:bb[2],:]
                                 scaled = misc.imresize(cropped, (args.image_size, args.image_size), interp='bilinear')
                                 nrof_successfully_aligned += 1
-                                output_filename_n = "{}_{}.{}".format(output_filename.split('.')[0], i, output_filename.split('.')[-1])
+                                # output_filename_n = "{}_{}.{}".format(output_filename.split('.')[0], i, output_filename.split('.')[-1])
+                                output_filename_n = "{}.{}".format(output_filename.split('.')[0], output_filename.split('.')[-1])
+
                                 misc.imsave(output_filename_n, scaled)
                                 text_file.write('%s %d %d %d %d\n' % (output_filename_n, bb[0], bb[1], bb[2], bb[3]))
                         else:

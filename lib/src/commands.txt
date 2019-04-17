@@ -1,0 +1,13 @@
+python validate_on_lfw.py /media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/lfw /media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/ckpt/20180402-114759
+
+
+python validate_on_lfw.py /media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/data_160x160 /media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/ckpt/20180402-114759
+
+python align/align_dataset_mtcnn.py  lfw lfw_aligned --image_size 160 --margin 32 --random_order --gpu_memory_fraction 0.5
+
+python train_tripletloss.py --pretrained_model /media/na/e03497de-87fb-4f35-a524-811dfc5997d9/workspace/Kien/Face_Recognition/lib/src/ckpt/20180402-114759
+
+/home/na/workspace/hdd/Kien/Face_Recognition/lib/data/learning_rate_schedule_classifier_msceleb.txt
+
+
+python train_tripletloss.py --pretrained_model ~/models/facenet/20180402-114759/model-20180402-114759.ckpt-275

@@ -54,6 +54,11 @@ data/
 data_download/
 **/hdf5_data/
 **/PartAnnotation/
+**/lfw
+**/lfw_aligned
+**/lfw_aligned_1
+**/lfw_min
+
 **/testing_ply_file_list.txt
 part_seg/train.py
 log/checkpoint

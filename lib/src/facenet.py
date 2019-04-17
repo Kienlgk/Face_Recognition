@@ -522,8 +522,26 @@ def calculate_val_far(threshold, dist, actual_issame):
     false_accept = np.sum(np.logical_and(predict_issame, np.logical_not(actual_issame)))
     n_same = np.sum(actual_issame)
     n_diff = np.sum(np.logical_not(actual_issame))
-    val = float(true_accept) / float(n_same)
-    far = float(false_accept) / float(n_diff)
+    with open("log_val_far.txt", "a") as log_file:
+        print(n_same, file=log_file)
+        print(n_diff, file=log_file)
+        print("---", file=log_file)
+    n_same_value = float(n_same)
+    n_diff_value = float(n_diff)
+    # add eps to avoid dividing zero exception
+    if n_same_value == 0:
+    #     n_same_value += 0.1
+        print(float(true_accept))
+        val = 0
+        far = float(false_accept) / n_diff_value
+    elif n_diff_value == 0:
+        print(float(false_accept))
+        far = 0
+        val = float(true_accept) / n_same_value
+    #     n_diff_value += 0.1
+    else:
+        val = float(true_accept) / n_same_value
+        far = float(false_accept) / n_diff_value
     return val, far
 
 def store_revision_info(src_path, output_dir, arg_string):
