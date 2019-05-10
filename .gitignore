@@ -70,3 +70,10 @@ sample_scripts
 **/lib/weights
 **/extracted_dict.pickle
 **/ckpt
+**/*.pyc
+**/*.pickle
+**/*.jpg
+**/*.png
+**/*.jpeg
+**/*.raw
+**/*.mp4

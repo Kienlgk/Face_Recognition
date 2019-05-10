@@ -365,16 +365,18 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--logs_base_dir', type=str, 
-        help='Directory where to write event logs.', default='~/logs/facenet')
+        help='Directory where to write event logs.', default='logs')
     parser.add_argument('--models_base_dir', type=str,
-        help='Directory where to write trained models and checkpoints.', default='~/models/facenet')
+        help='Directory where to write trained models and checkpoints.', default='weights')
     parser.add_argument('--gpu_memory_fraction', type=float,
         help='Upper bound on the amount of GPU memory that will be used by the process.', default=1.0)
     parser.add_argument('--pretrained_model', type=str,
         help='Load a pretrained model before training starts.')
     parser.add_argument('--data_dir', type=str,
         help='Path to the data directory containing aligned face patches. Multiple directories are separated with colon.',
-        default='~/datasets/casia/casia_maxpy_mtcnnalign_182_160')
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/lfw_aligned_1/')
+        # default='/home/na/workspace/deep_learning/Downloads/celebrity')
+        # default='~/datasets/casia/casia_maxpy_mtcnnalign_182_160')
     parser.add_argument('--model_def', type=str,
         help='Model definition. Points to a module containing the definition of the inference graph.', default='models.inception_resnet_v1')
     parser.add_argument('--max_nrof_epochs', type=int,
@@ -386,7 +388,7 @@ def parse_arguments(argv):
     parser.add_argument('--epoch_size', type=int,
         help='Number of batches per epoch.', default=1000)
     parser.add_argument('--embedding_size', type=int,
-        help='Dimensionality of the embedding.', default=128)
+        help='Dimensionality of the embedding.', default=512)
     parser.add_argument('--random_crop', 
         help='Performs random cropping of training images. If false, the center image_size pixels from the training images are used. ' +
          'If the size of the images in the data directory is equal to image_size no cropping is performed', action='store_true')
@@ -420,7 +422,9 @@ def parse_arguments(argv):
     parser.add_argument('--log_histograms', 
         help='Enables logging of weight/bias histograms in tensorboard.', action='store_true')
     parser.add_argument('--learning_rate_schedule_file', type=str,
-        help='File containing the learning rate schedule that is used when learning_rate is set to to -1.', default='data/learning_rate_schedule.txt')
+        help='File containing the learning rate schedule that is used when learning_rate is set to to -1.',
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/data/learning_rate_schedule_classifier_casia.txt')
+        # default='data/learning_rate_schedule.txt')
     parser.add_argument('--filter_filename', type=str,
         help='File containing image data used for dataset filtering', default='')
     parser.add_argument('--filter_percentile', type=float,
@@ -430,11 +434,15 @@ def parse_arguments(argv):
  
     # Parameters for validation on LFW
     parser.add_argument('--lfw_pairs', type=str,
-        help='The file containing the pairs to use for validation.', default='data/pairs.txt')
+        help='The file containing the pairs to use for validation.', 
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/pairs.txt')
+        # default='data/pairs.txt')
     parser.add_argument('--lfw_file_ext', type=str,
         help='The file extension for the LFW dataset.', default='png', choices=['jpg', 'png'])
     parser.add_argument('--lfw_dir', type=str,
-        help='Path to the data directory containing aligned face patches.', default='')
+        help='Path to the data directory containing aligned face patches.', 
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/lfw_aligned_1/')
+        # default='')
     parser.add_argument('--lfw_batch_size', type=int,
         help='Number of images to process in a batch in the LFW test set.', default=100)
     parser.add_argument('--lfw_nrof_folds', type=int,

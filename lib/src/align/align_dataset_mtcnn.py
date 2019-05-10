@@ -34,7 +34,7 @@ import numpy as np
 import facenet
 import align.detect_face
 import random
-from time import sleep
+from time import sleep, time
 
 def main(args):
     sleep(random.random())
@@ -86,6 +86,7 @@ def main(args):
                         errorMessage = '{}: {}'.format(image_path, e)
                         print(errorMessage)
                     else:
+                        start = time()
                         if img.ndim<2:
                             print('Unable to align "%s"' % image_path)
                             text_file.write('%s\n' % (output_filename))
@@ -132,7 +133,8 @@ def main(args):
                         else:
                             print('Unable to align "%s"' % image_path)
                             text_file.write('%s\n' % (output_filename))
-                            
+                        end = time()
+                        print('Cost: {} s for 1 image.'.format(end-start))
     print('Total number of images: %d' % nrof_images_total)
     print('Number of successfully aligned images: %d' % nrof_successfully_aligned)
             

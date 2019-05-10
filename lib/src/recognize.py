@@ -7,37 +7,178 @@ import sys
 import random
 from six import iteritems
 import numpy as np
-import retrieve
+from datetime import datetime
+from imutils.video import FPS
+import threading 
+# from threading import Lock
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+sys.path.append(BASE_DIR)
+sys.path.append(ROOT_DIR)
+
+# import retrieve
 from align import detect_face
 import tensorflow as tf
 import pickle
 import time
 import argparse
+import cv2
+from sklearn import metrics
+from scipy.optimize import brentq
+from scipy import interpolate
+from scipy import misc
+
+from facenet import load_data
+from facenet import load_img
+from facenet import load_model
+from facenet import to_rgb
+from facenet import get_model_filenames
+
+import queue
+
+# bufferless VideoCapture
+class VideoCapture:
+  def __init__(self, name):
+    self.cap = cv2.VideoCapture(name)
+    self.q = queue.Queue()
+    t = threading.Thread(target=self._reader)
+    t.daemon = True
+    t.start()
+
+  # read frames as soon as they are available, keeping only most recent one
+  def _reader(self):
+    while True:
+      ret, frame = self.cap.read()
+      if not ret:
+        break
+      if not self.q.empty():
+        try:
+          self.q.get_nowait()   # discard previous (unprocessed) frame
+        except queue.Empty:
+          pass
+      self.q.put(frame)
+
+  def read(self):
+    return self.q.get()
 
 def main(args):
-    ckpt = args.ckpt
-    embedding_dir = args.embedding_dir
+    ckpt = os.path.expanduser(args.ckpt)
+    embedding_dir = os.path.expanduser(args.embedding_dir)
+    is_stream = args.stream
     gpu_memory_fraction = args.gpu_memory_fraction
     graph_fr = tf.Graph()
     # Config memory for GTX 1080 with 8GB VRAM
     gpu_memory_fraction = 0.4
-    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
+    # config = tf.ConfigProto()
+    # config.gpu_options.allow_growth=True
+    # sess = tf.Session(config=config)
+    # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=gpu_memory_fraction)
+    gpu_options = tf.GPUOptions(allow_growth=True)
     sess_fr = tf.Session(graph=graph_fr, config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
+    meta_graph_file, ckpt_file = get_model_filenames(ckpt)
     with graph_fr.as_default():
-        saverf = tf.train.import_meta_graph(os.path.join(ckpt, 'model-20180402-114759.meta'))
-        saverf.restore(sess_fr, os.path.join(ckpt, 'model-20180402-114759.ckpt-275'))
+        saverf = tf.train.import_meta_graph(os.path.join(ckpt, meta_graph_file))
+        saverf.restore(sess_fr, os.path.join(ckpt, ckpt_file))
         pnet, rnet, onet = detect_face.create_mtcnn(sess_fr, None)
 
     with open(embedding_dir, 'rb') as f:
         embedding_dict = pickle.load(f)
     
-    def face_det():
-        retrieve.recognize_face(sess_fr, pnet, rnet, onet, embedding_dict)
+    def face_det(is_stream):
+        if is_stream:
+            recognize_face_stream(sess_fr, pnet, rnet, onet, feature_array=embedding_dict, args=args)
+        else:
+            recognize_face(sess_fr, pnet, rnet, onet, feature_array=embedding_dict, args=args)
 
-    face_det()
+    face_det(is_stream)
 
+def recognize_face(sess, pnet, rnet, onet, feature_array, args):
+    # Get input and output tensors
+    images_placeholder = sess.graph.get_tensor_by_name("input:0")
+    images_placeholder = tf.image.resize_images(images_placeholder,(160,160))
+    embeddings = sess.graph.get_tensor_by_name("embeddings:0")
+    phase_train_placeholder = sess.graph.get_tensor_by_name("phase_train:0")
+    image_size = args.image_size
+    embedding_size = embeddings.get_shape()[1]
+    imgdir = os.path.expanduser(args.imgdir)
+    if os.path.isfile(imgdir):
+        gray = cv2.imread(imgdir, cv2.IMREAD_GRAYSCALE)
+        if(gray.size > 0):
+            print(gray.size)
+            start = time.time()
+            response, faces,bboxs = align_face(gray,pnet, rnet, onet, args)
+            align = time.time()
+            print(response)
+            if (response == True):
+                for i, image in enumerate(faces):
+                    bb = bboxs[i]
+                    images = load_img(image, False, False, image_size)
+                    feed_dict = { images_placeholder:images, phase_train_placeholder:False }
+                    feature_vector = sess.run(embeddings, feed_dict=feed_dict)
+                    result, accuracy = identify_person(feature_vector, feature_array, 8)
+                    print(result.split("/")[1])
+                    print(accuracy)
 
-def recognize_face(sess,pnet, rnet, onet,feature_array):
+                    # if accuracy < 0.9:
+                    #     cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                    #     W = int(bb[2]-bb[0])//2
+                    #     H = int(bb[3]-bb[1])//2
+                    #     cv2.putText(gray,"Hello "+result.split("/")[1],(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                    # else:
+                    #     cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                    #     W = int(bb[2]-bb[0])//2
+                    #     H = int(bb[3]-bb[1])//2
+                    #     cv2.putText(gray,"WHO ARE YOU ?",(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                    del feature_vector
+            stop = time.time()
+            print('Cost {} s for embedding 1 image'.format(stop - start))
+            print('Cost {} s for align 1 image'.format(align-start))
+            # cv2.imshow('img',gray)
+            cv2.waitKey(0)
+        return
+    image_dirs = os.listdir(imgdir)
+    for image_dir in image_dirs:
+        image_dir =  os.path.join(imgdir, image_dir)
+        gray = cv2.imread(image_dir, cv2.IMREAD_GRAYSCALE)
+        if(gray.size > 0):
+            start = time.time()
+            print(gray.size)
+            response, faces,bboxs = align_face(gray,pnet, rnet, onet, args)
+            print(response)
+            if (response == True):
+                for i, image in enumerate(faces):
+                    bb = bboxs[i]
+                    images = load_img(image, False, False, image_size)
+                    feed_dict = { images_placeholder:images, phase_train_placeholder:False }
+                    feature_vector = sess.run(embeddings, feed_dict=feed_dict)
+                    result, accuracy = identify_person(feature_vector, feature_array, 8)
+                    print(result.split("/")[1])
+                    print(accuracy)
+
+                    if accuracy < 0.9:
+                        cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                        W = int(bb[2]-bb[0])//2
+                        H = int(bb[3]-bb[1])//2
+                        cv2.putText(gray,"Hello "+result.split("/")[1],(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                    else:
+                        cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                        W = int(bb[2]-bb[0])//2
+                        H = int(bb[3]-bb[1])//2
+                        cv2.putText(gray,"WHO ARE YOU ?",(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                    del feature_vector
+            stop = time.time()
+            print('Cost {} s for embedding 1 image'.format(stop - start))
+            # cv2.imshow('img',gray)
+            # cv2.waitKey(0)
+        else:
+            continue
+
+# lo = Lock()
+latest_frame = None
+last_ret = None
+
+def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
     # Get input and output tensors
     images_placeholder = sess.graph.get_tensor_by_name("input:0")
     images_placeholder = tf.image.resize_images(images_placeholder,(160,160))
@@ -46,50 +187,96 @@ def recognize_face(sess,pnet, rnet, onet,feature_array):
 
     image_size = args.image_size
     embedding_size = embeddings.get_shape()[1]
+    
+    
+    # cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    
 
-    cap = cv2.VideoCapture(-1)
+    # def rtsp_cam_buffer(vcap):
+    #     global latest_frame, last_ret
+    #     while True:
+    #         last_ret, latest_frame = vcap.read()
 
+    # t1 = threading.Thread(target=rtsp_cam_buffer,args=(cap, ),name="rtsp_read_thread")
+    # t1.daemon=True
+    # t1.start()
+    # fps = FPS().start()
+        
+    threshold = 0.9
     while(True):
-        ret, frame = cap.read()
-        gray = cv2.cvtColor(frame, 0)
+        # if (last_ret is not None) and (latest_frame is not None):
+        #     frame = latest_frame.copy()
+        # else:
+        #     print("Error: failed to capture image")
+        #     break
+        frame = cap.read()
+        # ret, frame = cap.read()
+        cap_time = datetime.now()
+        # gray = cv2.cvtColor(frame, 0)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # gray = gray[384:, 216:]
+        # gray = cv2.resize(gray, (960, 540))
+        gray = cv2.resize(gray, (960, 540))
+        frame = cv2.resize(frame, (960, 540))
+        # gray = cv2.resize(gray, (768, 432))
         if cv2.waitKey(1) & 0xFF == ord('q'):
             cap.release()
             cv2.destroyAllWindows()
             break
-        if(gray.size > 0):
-            print(gray.size)
-            response, faces,bboxs = align_face(gray,pnet, rnet, onet)
+        if (gray.size > 0):
+            start = time.time()
+            response, faces,bboxs = align_face(gray,pnet, rnet, onet, args)
+            align_face_time = time.time()
             print(response)
             if (response == True):
-                    for i, image in enumerate(faces):
-                            bb = bboxs[i]
-                            images = load_img(image, False, False, image_size)
-                            feed_dict = { images_placeholder:images, phase_train_placeholder:False }
-                            feature_vector = sess.run(embeddings, feed_dict=feed_dict)
-                            result, accuracy = identify_person(feature_vector, feature_array,8)
-                            print(result.split("/")[2])
-                            print(accuracy)
+                # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', '1', cap_time.strftime("%m_%d_%Y_%H_%M__S")+".png")), gray)
+                cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong_collect', str(cap_time)+".png")), frame)
+                # for i, image in enumerate(faces):
+                #     bb = bboxs[i]
+                #     images = load_img(image, False, False, image_size)
+                #     feed_dict = { images_placeholder:images, phase_train_placeholder:False }
+                #     # detect face only
+                #     cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                #     W = int(bb[2]-bb[0])//2
+                #     H = int(bb[3]-bb[1])//2
+                #     cv2.putText(gray,"Face",(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                #     # Calculate face embedding and compare with trained ones
+                #     feature_vector = sess.run(embeddings, feed_dict=feed_dict)
+                #     result, accuracy = identify_person(feature_vector, feature_array, 8)
+                #     print(result.split("/")[1])
+                #     print(accuracy)
+                #     if accuracy < threshold:
+                #         cv2.rectangle(frame,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                #         W = int(bb[2]-bb[0])//2
+                #         H = int(bb[3]-bb[1])//2
+                #         cv2.putText(frame,"Hello "+result.split("/")[1],(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                #     else:
+                #         cv2.rectangle(frame,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
+                #         W = int(bb[2]-bb[0])//2
+                #         H = int(bb[3]-bb[1])//2
+                #         cv2.putText(frame,"WHO ARE YOU ?",(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
+                #     del feature_vector
+                # # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'vom', str(cap_time)+".png")), gray)
+                # # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong', str(cap_time)+".png")), frame)
+                # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong_collect', str(cap_time)+".png")), frame)
 
-                            if accuracy < 0.9:
-                                cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
-                                W = int(bb[2]-bb[0])//2
-                                H = int(bb[3]-bb[1])//2
-                                cv2.putText(gray,"Hello "+result.split("/")[2],(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
-                            else:
-                                cv2.rectangle(gray,(bb[0],bb[1]),(bb[2],bb[3]),(255,255,255),2)
-                                W = int(bb[2]-bb[0])//2
-                                H = int(bb[3]-bb[1])//2
-                                cv2.putText(gray,"WHO ARE YOU ?",(bb[0]+W-(W//2),bb[1]-7), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255),1,cv2.LINE_AA)
-                            del feature_vector
 
-            cv2.imshow('img',gray)
+            stop = time.time()
+            print('Cost {} s for aligning 1 image'.format(align_face_time - start))
+            print('Cost {} s for embedding 1 image'.format(stop - start))
+            cv2.imshow('img',frame)
+            # cv2.waitKey(0)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
         else:
             continue
+    cap.release()
+    pass
 
 
-def align_face(img,pnet, rnet, onet):
+def align_face(img, pnet, rnet, onet, args):
 
-    minsize = 20 # minimum size of face
+    minsize = 30 # minimum size of face
     threshold = [ 0.6, 0.7, 0.7 ]  # three steps's threshold
     factor = 0.709 # scale factor
 
@@ -142,7 +329,7 @@ def align_face(img,pnet, rnet, onet):
             bb[3] = np.minimum(det[3]+args.margin/2, img_size[0])
             cropped = img[bb[1]:bb[3],bb[0]:bb[2],:]
             scaled = misc.imresize(cropped, (args.image_size, args.image_size), interp='bilinear')
-            misc.imsave("cropped.png", scaled)
+            # misc.imsave("cropped.png", scaled)
             faces.append(scaled)
             bboxes.append(bb)
             print("leaving align face")
@@ -150,20 +337,35 @@ def align_face(img,pnet, rnet, onet):
 
 
 def identify_person(image_vector, feature_array, k=9):
+    # features = np.asarray(list(feature_array.values()))
+    # noEmbedding = features.shape[0]
+    # image_vector = np.tile(image_vector, (noEmbedding, 1))
+    # top_k_ind = np.argsort(np.linalg.norm(image_vector-features, axis=1))
     top_k_ind = np.argsort([np.linalg.norm(image_vector-pred_row) \
-                        for ith_row, pred_row in enumerate(feature_array.values())])[:k]
-    result = feature_array.keys()[top_k_ind[0]]
-    acc = np.linalg.norm(image_vector-feature_array.values()[top_k_ind[0]])
+                        for pred_row in (list(feature_array.values()))])[:k]
+                        # for ith_row, pred_row in enumerate(list(feature_array.values()))])[:k]
+
+    result = list(feature_array.keys())[top_k_ind[0]]
+    acc = np.linalg.norm(image_vector-list(feature_array.values())[top_k_ind[0]])
     return result, acc
 
 
-if __name__ == "__main__":
+def arguments_parser(argv):
     handler = argparse.ArgumentParser()
-    handler.add_argument("--imgdir", help="Testing images directory")
-    handler.add_argument("--embedding_dir", help="Directory of the embedding file")
-    handler.add_argument("--ckpt", help="Model's weights .ckpt file")
+    handler.add_argument("--imgdir", default="", help="Testing images directory")
+    handler.add_argument("--embedding_dir", default="~/workspace/hdd/Kien/Face_Recognition/lib/src/embedding_dict.pickle", 
+                        help="Directory of the embedding file")
+    handler.add_argument("--ckpt", default="~/workspace/hdd/Kien/Face_Recognition/lib/src/ckpt/20180402-114759",
+                        help="Model's weights .ckpt file")
     handler.add_argument("--gpu_memory_fraction", default=0.85)
+    handler.add_argument('--image_size', type=int, help='Image size (height, width) in pixels.', default=160)
+    handler.add_argument('--detect_multiple_faces', type=bool,
+                        help='Detect and align multiple faces per image.', default=True)
+    handler.add_argument('--margin', type=int,
+                        help='Margin for the crop around the bounding box (height, width) in pixels.', default=44)
+    handler.add_argument("--stream", default=False, action='store_true')
+    return handler.parse_args()
 
-    # handler.add_argument()
-    FLAGS = handler.parse_args()
-    main(FLAGS)
+
+if __name__ == "__main__":
+    main(arguments_parser(sys.argv[1:]))

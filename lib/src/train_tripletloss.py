@@ -31,6 +31,7 @@ from datetime import datetime
 import os.path
 import time
 import sys
+
 import tensorflow as tf
 import numpy as np
 import importlib
@@ -38,6 +39,9 @@ import itertools
 import argparse
 import facenet
 import lfw
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
 
 from tensorflow.python.ops import data_flow_ops
 
@@ -48,10 +52,10 @@ def main(args):
     network = importlib.import_module(args.model_def)
 
     subdir = datetime.strftime(datetime.now(), '%Y%m%d-%H%M%S')
-    log_dir = os.path.join(os.path.expanduser(args.logs_base_dir), subdir)
+    log_dir = os.path.join(os.path.join(ROOT_DIR, os.path.expanduser(args.logs_base_dir)), subdir)
     if not os.path.isdir(log_dir):  # Create the log directory if it doesn't exist
         os.makedirs(log_dir)
-    model_dir = os.path.join(os.path.expanduser(args.models_base_dir), subdir)
+    model_dir = os.path.join(os.path.join(ROOT_DIR, os.path.expanduser(args.models_base_dir)), subdir)
     if not os.path.isdir(model_dir):  # Create the model directory if it doesn't exist
         os.makedirs(model_dir)
 
@@ -146,18 +150,26 @@ def main(args):
         regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         total_loss = tf.add_n([triplet_loss] + regularization_losses, name='total_loss')
 
+        variables_to_train = _get_variables_to_train()
+        print(variables_to_train)
+
         # Build a Graph that trains the model with one batch of examples and updates the model parameters
         train_op = facenet.train(total_loss, global_step, args.optimizer, 
             learning_rate, args.moving_average_decay, tf.global_variables())
+            # learning_rate, args.moving_average_decay, variables_to_train)
         
+        
+        # print(tf.trainable_variables())
         # Create a saver
         saver = tf.train.Saver(tf.trainable_variables(), max_to_keep=3)
+        # [print(trainable) for trainable in tf.trainable_variables()]
 
         # Build the summary operation based on the TF collection of Summaries.
         summary_op = tf.summary.merge_all()
 
         # Start running operations on the Graph.
-        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=args.gpu_memory_fraction)
+        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=args.gpu_memory_fraction)
+        gpu_options = tf.GPUOptions(allow_growth=True)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))        
 
         # Initialize variables
@@ -173,6 +185,9 @@ def main(args):
             if args.pretrained_model:
                 print('Restoring pretrained model: %s' % args.pretrained_model)
                 saver.restore(sess, os.path.expanduser(args.pretrained_model))
+            # [print(trainable) for trainable in tf.trainable_variables()]
+            # print(len(tf.trainable_variables()))
+            # exit()
 
             # Training and validation loop
             epoch = 0
@@ -196,6 +211,23 @@ def main(args):
 
     return model_dir
 
+def _get_variables_to_train(trainable_scopes='InceptionResnetV1/Logits,InceptionResnetV1/AuxLogits,InceptionResnetV1/Bottleneck'):
+  """Returns a list of variables to train.
+
+  Returns:
+    A list of variables to train by the optimizer.
+  """
+  if trainable_scopes is None:
+    return tf.trainable_variables()
+  else:
+    scopes = [scope.strip() for scope in trainable_scopes.split(',')]
+
+  variables_to_train = []
+  for scope in scopes:
+    variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope)
+    # variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+    variables_to_train.extend(variables)
+  return variables_to_train
 
 def train(args, sess, dataset, epoch, image_paths_placeholder, labels_placeholder, labels_batch,
           batch_size_placeholder, learning_rate_placeholder, phase_train_placeholder, enqueue_op, input_queue, global_step, 
@@ -417,16 +449,17 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--logs_base_dir', type=str, 
-        help='Directory where to write event logs.', default='~/logs/facenet')
+        help='Directory where to write event logs.', default='logs')
     parser.add_argument('--models_base_dir', type=str,
-        help='Directory where to write trained models and checkpoints.', default='~/models/facenet')
+        help='Directory where to write trained models and checkpoints.', default='weights')
     parser.add_argument('--gpu_memory_fraction', type=float,
         help='Upper bound on the amount of GPU memory that will be used by the process.', default=0.85)
     parser.add_argument('--pretrained_model', type=str,
         help='Load a pretrained model before training starts.')
     parser.add_argument('--data_dir', type=str,
         help='Path to the data directory containing aligned face patches. Multiple directories are separated with colon.',
-        default='/home/na/workspace/hdd/data/celebrity')
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/lfw_aligned_1/')
+        # default='/home/na/workspace/deep_learning/Downloads/celebrity')
         # default='~/datasets/casia/casia_maxpy_mtcnnalign_182_160')
     parser.add_argument('--model_def', type=str,
         help='Model definition. Points to a module containing the definition of the inference graph.', default='models.inception_resnet_v1')
@@ -470,16 +503,18 @@ def parse_arguments(argv):
         help='Random seed.', default=666)
     parser.add_argument('--learning_rate_schedule_file', type=str,
         help='File containing the learning rate schedule that is used when learning_rate is set to to -1.',
-        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/data/learning_rate_schedule_classifier_msceleb.txt')
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/data/learning_rate_msceleb_tripletloss.txt')
         # default='data/learning_rate_schedule.txt')
 
     # Parameters for validation on LFW
     parser.add_argument('--lfw_pairs', type=str,
-        help='The file containing the pairs to use for validation.', default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/pairs.txt')
+        help='The file containing the pairs to use for validation.', 
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/pairs.txt')
     parser.add_argument('--lfw_file_ext', type=str,
         help='The file extension for the LFW dataset.', default='png', choices=['jpg', 'png'])
     parser.add_argument('--lfw_dir', type=str,
-        help='Path to the data directory containing aligned face patches.', default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/lfw_aligned_1/')
+        help='Path to the data directory containing aligned face patches.', 
+        default='/home/na/workspace/hdd/Kien/Face_Recognition/lib/src/lfw_aligned_1/')
     parser.add_argument('--lfw_nrof_folds', type=int,
         help='Number of folds to use for cross validation. Mainly used for testing.', default=10)
     return parser.parse_args(argv)

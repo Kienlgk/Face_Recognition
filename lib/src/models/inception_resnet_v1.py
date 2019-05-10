@@ -168,13 +168,11 @@ def inception_resnet_v1(inputs, is_training=True,
       end_points: the set of end_points from the inception model.
     """
     end_points = {}
-  
     with tf.variable_scope(scope, 'InceptionResnetV1', [inputs], reuse=reuse):
         with slim.arg_scope([slim.batch_norm, slim.dropout],
                             is_training=is_training):
             with slim.arg_scope([slim.conv2d, slim.max_pool2d, slim.avg_pool2d],
                                 stride=1, padding='SAME'):
-      
                 # 149 x 149 x 32
                 net = slim.conv2d(inputs, 32, 3, stride=2, padding='VALID',
                                   scope='Conv2d_1a_3x3')

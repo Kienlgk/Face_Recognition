@@ -51,12 +51,20 @@ def main(args):
             # ashish = ['datasets/kar_Vin_aligned/Ashish/' + f for f in os.listdir('datasets/kar_Vin_aligned/Ashish')]
             # saurabh = ['datasets/kar_Vin_aligned/Saurabh/' + f for f in os.listdir('datasets/kar_Vin_aligned/Saurabh')]
             # hari = ['datasets/kar_Vin_aligned/Hari/' + f for f in os.listdir('datasets/kar_Vin_aligned/Hari')]
-            vinayak =  [os.path.join('data_160x160', '4', f) for f in os.listdir(os.path.join('data_160x160', '4'))]
-            karthik =  [os.path.join('data_160x160', '6', f) for f in os.listdir(os.path.join('data_160x160', '6'))]
-            ashish = [os.path.join('data_160x160', '15', f) for f in os.listdir(os.path.join('data_160x160', '15'))]
-            saurabh = [os.path.join('data_160x160', '16', f) for f in os.listdir(os.path.join('data_160x160', '16'))]
-            hari = [os.path.join('data_160x160', '20', f) for f in os.listdir(os.path.join('data_160x160', '20'))]
-            paths = vinayak+karthik+ashish+saurabh+hari
+            # vinayak =  [os.path.join('data_160x160', '4', f) for f in os.listdir(os.path.join('data_160x160', '4'))]
+            # karthik =  [os.path.join('data_160x160', '6', f) for f in os.listdir(os.path.join('data_160x160', '6'))]
+            # ashish = [os.path.join('data_160x160', '15', f) for f in os.listdir(os.path.join('data_160x160', '15'))]
+            # saurabh = [os.path.join('data_160x160', '16', f) for f in os.listdir(os.path.join('data_160x160', '16'))]
+            # hari = [os.path.join('data_160x160', '20', f) for f in os.listdir(os.path.join('data_160x160', '20'))]
+            data_dir = os.path.expanduser(os.path.join('~', 'workspace', 'hdd', 'data', 'celebrity_7650_folders'))
+            folders = os.listdir(data_dir)
+            paths = []
+            for folder in folders[:-2]:
+                paths += [os.path.join(data_dir, folder, f) for f in os.listdir(os.path.join(data_dir, folder))]
+            print("removed:")
+            for folder in folders[-2:]:
+                print(folder)
+            # paths = vinayak+karthik+ashish+saurabh+hari
             #np.save("images.npy",paths)
             # Load the model
             facenet.load_model(args.model)
@@ -78,10 +86,10 @@ def main(args):
                 feed_dict = { images_placeholder:images, phase_train_placeholder:False }
                 feature_vector = sess.run(embeddings, feed_dict=feed_dict)
                 extracted_dict[filename] =  feature_vector
-                if(i%100 == 0):
+                if(i%1000 == 0):
                     print("completed",i," images")
-
-            with open('extracted_dict.pickle','wb') as f:
+            print("Done.")
+            with open('embedding_dict.pickle','wb') as f:
                 pickle.dump(extracted_dict,f)
 
             
@@ -91,7 +99,7 @@ def parse_arguments(argv):
 
     parser.add_argument('--lfw_batch_size', type=int,
         help='Number of images to process in a batch in the LFW test set.', default=100)
-    parser.add_argument('--model', type=str,default='E:/workspace/deep_learning/Face_Recognition/lib/weights/20180408-102900', 
+    parser.add_argument('--model', type=str,default='~/workspace/hdd/Kien/Face_Recognition/lib/src/ckpt/20180402-114759', 
         help='Could be either a directory containing the meta_file and ckpt_file or a model protobuf (.pb) file')
     parser.add_argument('--image_size', type=int,
         help='Image size (height, width) in pixels.', default=160)

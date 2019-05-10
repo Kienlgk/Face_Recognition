@@ -33,6 +33,8 @@ import base64
 import sys
 import os
 import cv2
+import io
+from PIL import Image
 import argparse
 import facenet
 
@@ -61,10 +63,11 @@ def main(args):
             fields = line.split('\t')
             class_dir = fields[0]
             img_name = fields[1] + '-' + fields[4] + '.' + args.output_format
-            img_string = fields[5]
+            img_string = fields[6]
             img_dec_string = base64.b64decode(img_string)
             img_data = np.fromstring(img_dec_string, dtype=np.uint8)
             img = cv2.imdecode(img_data, cv2.IMREAD_COLOR) #pylint: disable=maybe-no-member
+            # img = cv2.imdecode(img_data, cv2.IMREAD_ANYCOLOR) #pylint: disable=maybe-no-member
             if args.size:
                 img = misc.imresize(img, (args.size, args.size), interp='bilinear')
             full_class_dir = os.path.join(output_dir, class_dir)
