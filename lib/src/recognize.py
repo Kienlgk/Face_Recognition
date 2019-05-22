@@ -69,6 +69,28 @@ class VideoCapture:
     def get_base64(self):
         return base64.b64encode(self.q.get().tobytes())
 
+
+class ReturnQueue:
+    def __init__(self):
+        self.q = queue.Queue()
+
+    def add(self, frame_base64):
+        if not self.q.empty():
+            try:
+                self.q.get_nowait()
+            except queue.Empty:
+                pass
+        self.q.put(frame_base64)
+
+    def get(self):
+        if not self.q.empty():
+            try:
+                return self.q.get()
+            except queue.Empty:
+                pass
+        return None
+
+
 def main(args):
     ckpt = os.path.expanduser(args.ckpt)
     embedding_dir = os.path.expanduser(args.embedding_dir)
@@ -215,6 +237,13 @@ def recognize_face(sess, pnet, rnet, onet, feature_array, args):
 latest_frame = None
 last_ret = None
 
+global_cap = VideoCapture("")
+global_return_queue = ReturnQueue()
+
+
+def get_frame():
+    return global_cap.get_base64()
+
 
 def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
     # Get input and output tensors
@@ -229,7 +258,7 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
     # cap = cv2.VideoCapture("http://192.168.1.12:81/videostream.cgi?user=admin&pwd=123456789?action=stream?dummy
     # =param.mjpg")
     # cap = cv2.VideoCapture("http://192.168.1.12:81/videostream.cgi?user=admin&pwd=123456789")
-    cap = VideoCapture("")
+    # cap = VideoCapture("")
     # def rtsp_cam_buffer(vcap):
     #     global latest_frame, last_ret
     #     while True:
@@ -250,7 +279,7 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
         # else:
         #     print("Error: failed to capture image")
         #     break
-        frame = cap.read()
+        frame = global_cap.read()
         # ret, frame = cap.read()
         cap_time = datetime.now()
         # frame = misc.imread(frame)
@@ -304,8 +333,9 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
                         cv2.rectangle(frame, (bb[0], bb[1]), (bb[2], bb[3]), (255, 255, 255), 2)
                         W = int(bb[2] - bb[0]) // 2
                         H = int(bb[3] - bb[1]) // 2
-                        cv2.putText(frame, result.split("/")[-2] + " dist: " + str(accuracy), (bb[0] + W - (W // 2), bb[1] - 7),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                        cv2.putText(frame, result.split("/")[-2] + " dist: " + str(accuracy),
+                                    (bb[0] + W - (W // 2), bb[1] - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255),
+                                    1, cv2.LINE_AA)
                     else:
                         cv2.rectangle(frame, (bb[0], bb[1]), (bb[2], bb[3]), (255, 255, 255), 2)
                         W = int(bb[2] - bb[0]) // 2
@@ -326,8 +356,9 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
             print('Cost {} s for aligning 1 image'.format(align_face_time - start))
             print('Cost {} s for matching embedding 1 image'.format(stop - start))
             # cv2.imshow('img', cv2.cvtColor(gray, cv2.COLOR_RGB2BGR))
-            cv2.imshow('Video', frame)
-
+            # cv2.imshow('Video', frame)
+            base64_frame = base64.b64encode(frame.tobytes())
+            global_return_queue.add(base64_frame)
             # cv2.waitKey(0)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
