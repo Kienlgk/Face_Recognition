@@ -8,7 +8,7 @@ import random
 from six import iteritems
 import numpy as np
 from datetime import datetime
-from imutils.video import FPS
+# from imutils.video import FPS
 import threading
 
 # from threading import Lock
@@ -67,7 +67,7 @@ class VideoCapture:
         return self.q.get()
 
     def get_base64(self):
-        return base64.b64encode(self.q.get().tobytes())
+        return base64.b64encode(self.q.get().tobytes()).decode('utf-8')
 
 
 class ReturnQueue:
