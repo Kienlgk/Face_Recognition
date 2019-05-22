@@ -77,3 +77,6 @@ sample_scripts
 **/*.jpeg
 **/*.raw
 **/*.mp4
+lib/src/log_val_far\.txt
+
+lib/src/embeddings\.npy
