@@ -22,6 +22,7 @@ import tensorflow as tf
 import numpy as np
 import pickle
 import time
+import threading
 
 # sys.path.append('..')
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +35,7 @@ from lib.src.align import detect_face
 from tensorflow.python.platform import gfile
 from lib.src.facenet import get_model_filenames
 from lib.src.recognize import recognize_face_stream
-from lib.src.recognize import get_frame
+from lib.src.recognize import get_frame, get_recognized_frame
 from json import dumps
 
 from dict2obj import to_obj
@@ -45,9 +46,9 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 cors = CORS(app, resources={r"/facerecognitionLive": {"origins": "http://localhost:8888"}})
 # auth = HTTPBasicAuth()
 
-# config_args = {"detect_multiple_faces": True, "margin": 44, "image_size": 160,
-#                "embedding_dir": "~/workspace/hdd/Kien/Face_Recognition/lib/src/embedding_ktx.pickle",
-#                "ckpt": "~/workspace/hdd/Kien/Face_Recognition/lib/src/ckpt/20180402-114759"}
+config_args = {"detect_multiple_faces": True, "margin": 44, "image_size": 160,
+               "embedding_dir": "~/workspace/hdd/Kien/Face_Recognition/lib/src/embedding_ktx.pickle",
+               "ckpt": "~/workspace/hdd/Kien/Face_Recognition/lib/src/ckpt/20180402-114759"}
 
 # ==============================================================================================================================
 #
@@ -58,23 +59,24 @@ cors = CORS(app, resources={r"/facerecognitionLive": {"origins": "http://localho
 #
 
 # ==============================================================================================================================
-# EMBEDDING_DIR = os.path.expanduser(config_args["embedding_dir"])
-# CKPT = os.path.expanduser(config_args["ckpt"])
+EMBEDDING_DIR = os.path.expanduser(config_args["embedding_dir"])
+CKPT = os.path.expanduser(config_args["ckpt"])
 
-# with open(EMBEDDING_DIR, 'rb') as f:
-#     feature_array = pickle.load(f)
+with open(EMBEDDING_DIR, 'rb') as f:
+    feature_array = pickle.load(f)
 
-# ckpt = CKPT
+ckpt = CKPT
 
-# graph_fr = tf.Graph()
+graph_fr = tf.Graph()
 
-# gpu_options = tf.GPUOptions(allow_growth=True)
-# sess_fr = tf.Session(graph=graph_fr, config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
-# meta_graph_file, ckpt_file = get_model_filenames(ckpt)
-# with graph_fr.as_default():
-#     saverf = tf.train.import_meta_graph(os.path.join(ckpt, meta_graph_file))
-#     saverf.restore(sess_fr, os.path.join(ckpt, ckpt_file))
-#     pnet, rnet, onet = detect_face.create_mtcnn(sess_fr, None)
+gpu_options = tf.GPUOptions(allow_growth=True)
+sess_fr = tf.Session(graph=graph_fr, config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
+meta_graph_file, ckpt_file = get_model_filenames(ckpt)
+with graph_fr.as_default():
+    saverf = tf.train.import_meta_graph(os.path.join(ckpt, meta_graph_file))
+    saverf.restore(sess_fr, os.path.join(ckpt, ckpt_file))
+    pnet, rnet, onet = detect_face.create_mtcnn(sess_fr, None)
+
 
 # ==============================================================================================================================
 #
@@ -85,20 +87,16 @@ cors = CORS(app, resources={r"/facerecognitionLive": {"origins": "http://localho
 #
 
 # ==============================================================================================================================
-# recognize_face_stream(sess_fr, pnet, rnet, onet, feature_array, to_obj(config_args))
 
 
 @app.route('/facerecognitionLive', methods=['GET', 'OPTIONS'])
-@cross_origin(origin='http://127.0.0.1',headers=['Content- Type','Authorization'])
+@cross_origin(origin='http://127.0.0.1', headers=['Content- Type', 'Authorization'])
 def face_det():
-    # recognize_face_stream(sess_fr, pnet, rnet, onet, feature_array, to_obj(config_args))
-    response = app.response_class(response=dumps({'img': get_frame()}), status=200, mimetype='application/json')
-    # response = jsonify({'a': 'b'})
-    # response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8000')
-    # response.headers.add("Access-Control-Allow-Headers", "*")
-    # response.headers.add("Access-Control-Allow-Methods", "*")
+    response = app.response_class(response=dumps({'img': get_recognized_frame()}), status=200,
+                                  mimetype='application/json')
     return response
-#
+
+
 # @app.route('/getLatestFrame', method=['GET', 'POST'])
 # def get_latest_frame():
 #     return get_frame()
@@ -116,5 +114,17 @@ def main():
     return render_template("main.html")
 
 
+def loop_inf():
+    print("loop")
+    while True:
+        pass
+
+
+t = threading.Thread(target=recognize_face_stream,
+                     args=(sess_fr, pnet, rnet, onet, feature_array, to_obj(config_args),))
+t.daemon = True
+t.start()
+
+print('abc')
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port='8888')

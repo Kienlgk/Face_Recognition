@@ -1,23 +1,5 @@
-$(document).on("click", ".btn-get-stream", function(){
-    fetchdata();
-});
 
 function fetchdata(){
-//  $.ajax({
-//   url: 'http://127.0.0.1:8888/facerecognitionLive',
-//   type: 'GET',
-//   dataType: 'jsonp',
-//   crossDomain: true,
-// //   crossOrigin: true,
-//   success: function(res){
-//     print(res);
-//     // Perform operation on the return value
-//     res = JSON.parse(res)
-//     base64_string = res.img
-//     print(base64_string)
-//     $('.streaming').setAttribute('src', 'data:image/jpg;base64,' + base64_string);
-//   }
-//  });
     makeCorsRequest();
 }
 
@@ -54,14 +36,8 @@ function makeCorsRequest() {
         var jsonRes = xhr.responseText;
         res = JSON.parse(jsonRes)
         console.log(res.img)
-        decoded_file = atob(res.img)
-        blob = new Blob([decoded_file], {type: 'application/octet-stream'});
-        var imageUrl = URL.createObjectURL(blob)
-        
-        $('.streaming').attr('src', imageUrl);
-        // urlCreatorrevokeObjectURL()
-        // var title = getTitle(text);
-        // alert('Response from CORS request to ' + url + ': ' + title);
+
+        $('.streaming').attr('src', 'data:image/gif;base64,'+res.img);
     };
 
     xhr.onerror = function() {
@@ -71,6 +47,9 @@ function makeCorsRequest() {
     xhr.send();
 }
 
-//$(document).ready(function(){
-// setInterval(fetchdata,5000);
-//});
+$(document).ready(function(){
+    $(document).on("click", ".btn-get-stream", function(){
+        fetchdata();
+    });
+    setInterval(fetchdata, 1000);
+});

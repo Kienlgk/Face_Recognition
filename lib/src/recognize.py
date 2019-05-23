@@ -26,6 +26,8 @@ import time
 import argparse
 import base64
 import cv2
+from io import BytesIO
+from PIL import Image
 from sklearn import metrics
 from scipy.optimize import brentq
 from scipy import interpolate
@@ -67,7 +69,11 @@ class VideoCapture:
         return self.q.get()
 
     def get_base64(self):
-        return base64.b64encode(self.q.get().tobytes()).decode('utf-8')
+        pil_img = Image.fromarray(cv2.cvtColor(self.q.get(), cv2.COLOR_BGR2RGB))
+        buff = BytesIO()
+        pil_img.save(buff, format="PNG")
+        base64_string = base64.b64encode(buff.getvalue()).decode("utf-8")
+        return base64_string
 
 
 class ReturnQueue:
@@ -245,6 +251,10 @@ def get_frame():
     return global_cap.get_base64()
 
 
+def get_recognized_frame():
+    return global_return_queue.get()
+
+
 def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
     # Get input and output tensors
     images_placeholder = sess.graph.get_tensor_by_name("input:0")
@@ -273,7 +283,7 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
     ext = ".png"
     # cv2.namedWindow('Video',cv2.WINDOW_NORMAL)
     # cv2.resizeWindow('Video', 960, 540)
-    while (True):
+    while True:
         # if (last_ret is not None) and (latest_frame is not None):
         #     frame = latest_frame.copy()
         # else:
@@ -305,7 +315,7 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
             start = time.time()
             response, faces, bboxs = align_face(gray, pnet, rnet, onet, args)
             align_face_time = time.time()
-            print(response)
+            # print(response)
             if (response == True):
                 # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', '1',
                 # cap_time.strftime("%m_%d_%Y_%H_%M__S")+".png")), gray)
@@ -327,8 +337,8 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
                     # Calculate face embedding and compare with trained ones
                     feature_vector = sess.run(embeddings, feed_dict=feed_dict)
                     result, accuracy = identify_person(feature_vector, feature_array, 8)
-                    print(result.split("/")[-2])
-                    print(accuracy)
+                    # print(result.split("/")[-2])
+                    # print(accuracy)
                     if accuracy < threshold:
                         cv2.rectangle(frame, (bb[0], bb[1]), (bb[2], bb[3]), (255, 255, 255), 2)
                         W = int(bb[2] - bb[0]) // 2
@@ -342,23 +352,24 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
                         H = int(bb[3] - bb[1]) // 2
                         cv2.putText(frame, "?????", (bb[0] + W - (W // 2), bb[1] - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                     (255, 255, 255), 1, cv2.LINE_AA)
-                    del feature_vector
-                # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'vom',
-                # str(cap_time)+".png")), gray)
-                # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong',
-                # str(cap_time)+".png")), frame)
-                # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data', 'cam',
-                # 'tuong_1_collect', str(cap_time)+".png")), frame)
-                cv2.imwrite(os.path.expanduser(
-                    os.path.join('~', 'workspace', 'hdd', 'Kien', 'data', 'demo', 'tuong', str(cap_time) + ext)), frame)
+                    del feature_vector  # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien',
+                    # 'data', 'cam', 'vom',  # str(cap_time)+".png")), gray)  # cv2.imwrite(os.path.expanduser(  #
+                    # os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong',  # str(cap_time)+".png")),
+                    # frame)  # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data',
+                    # 'cam',  # 'tuong_1_collect', str(cap_time)+".png")), frame)  # cv2.imwrite(os.path.expanduser(
+                    #     os.path.join('~', 'workspace', 'hdd', 'Kien', 'data', 'demo', 'tuong', str(cap_time) +  #
+                    #     ext)), frame)
 
             stop = time.time()
-            print('Cost {} s for aligning 1 image'.format(align_face_time - start))
-            print('Cost {} s for matching embedding 1 image'.format(stop - start))
+            # print('Cost {} s for aligning 1 image'.format(align_face_time - start))
+            # print('Cost {} s for matching embedding 1 image'.format(stop - start))
             # cv2.imshow('img', cv2.cvtColor(gray, cv2.COLOR_RGB2BGR))
             # cv2.imshow('Video', frame)
-            base64_frame = base64.b64encode(frame.tobytes())
-            global_return_queue.add(base64_frame)
+            pil_img = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            buff = BytesIO()
+            pil_img.save(buff, format="PNG")
+            base64_string = base64.b64encode(buff.getvalue()).decode("utf-8")
+            global_return_queue.add(base64_string)
             # cv2.waitKey(0)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -436,7 +447,7 @@ def identify_person(image_vector, feature_array, k=9):
     # for ith_row, pred_row in enumerate(list(feature_array.values()))])[:k]
 
     result = list(feature_array.keys())[top_k_ind[0]]
-    print("result: ", result)
+    # print("result: ", result)
     acc = np.linalg.norm(image_vector - list(feature_array.values())[top_k_ind[0]])
     return result, acc
 
