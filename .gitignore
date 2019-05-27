@@ -80,3 +80,5 @@ sample_scripts
 lib/src/log_val_far\.txt
 
 lib/src/embeddings\.npy
+
+lib/weights_old/

@@ -7,6 +7,5 @@ Pillow
 requests
 psutil
 flask
-Flask-HTTPAuth
 flask-cors
 six
