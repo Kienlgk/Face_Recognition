@@ -4,6 +4,7 @@ opencv-python
 h5py
 matplotlib
 Pillow
+tqdm
 requests
 psutil
 flask
