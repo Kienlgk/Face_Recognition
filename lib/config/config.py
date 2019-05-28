@@ -1,0 +1,1 @@
+CONFIGS = {'stream_link': ''}

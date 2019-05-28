@@ -12,12 +12,12 @@ from datetime import datetime
 import threading
 
 # from threading import Lock
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 sys.path.append(ROOT_DIR)
 
+from lib.config.config import CONFIGS
 # import retrieve
 from align import detect_face
 import tensorflow as tf
@@ -243,7 +243,7 @@ def recognize_face(sess, pnet, rnet, onet, feature_array, args):
 latest_frame = None
 last_ret = None
 
-global_cap = VideoCapture("")
+global_cap = VideoCapture(CONFIGS['stream_link'])
 global_return_queue = ReturnQueue()
 
 
@@ -353,7 +353,7 @@ def recognize_face_stream(sess, pnet, rnet, onet, feature_array, args):
                         cv2.putText(frame, "?????", (bb[0] + W - (W // 2), bb[1] - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                     (255, 255, 255), 1, cv2.LINE_AA)
                     del feature_vector  # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien',
-                    # 'data', 'cam', 'vom',  # str(cap_time)+".png")), gray)  # cv2.imwrite(os.path.expanduser(  #
+                    # 'data', 'cam', 'vom',  # str(cap_time)+".png")), gray)  # cv2.imwrite(os.path.expanduser(  #  #
                     # os.path.join('~','workspace','hdd','Kien', 'data', 'cam', 'tuong',  # str(cap_time)+".png")),
                     # frame)  # cv2.imwrite(os.path.expanduser(os.path.join('~','workspace','hdd','Kien', 'data',
                     # 'cam',  # 'tuong_1_collect', str(cap_time)+".png")), frame)  # cv2.imwrite(os.path.expanduser(

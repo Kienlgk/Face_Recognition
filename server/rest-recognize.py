@@ -47,8 +47,8 @@ cors = CORS(app, resources={r"/facerecognitionLive": {"origins": "http://localho
 # auth = HTTPBasicAuth()
 
 config_args = {"detect_multiple_faces": True, "margin": 44, "image_size": 160,
-               "embedding_dir": "~/workspace/hdd/Kien/Face_Recognition/lib/src/embedding_ktx.pickle",
-               "ckpt": "~/workspace/hdd/Kien/Face_Recognition/lib/src/ckpt/20180402-114759"}
+               "embedding_dir": os.path.join(ROOT_DIR, "lib/src/embedding_ktx.pickle"),
+               "ckpt": os.path.join(ROOT_DIR, "lib/src/ckpt/20180402-114759")}
 
 # ==============================================================================================================================
 #
