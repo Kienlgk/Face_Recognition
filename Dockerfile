@@ -1,10 +1,12 @@
 FROM tensorflow/tensorflow:1.9.0-gpu-py3
-COPY . /app
 WORKDIR /app
-RUN apt-get update
-RUN apt-get install -y libsm6 libxext6 libxrender-dev
-RUN apt-get install -y python3-tk
+COPY requirements.txt requirements.txt
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libsm6 libxext6 libxrender-dev \
+    python3-tk \
+    make \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install -r requirements.txt
-RUN export PYTHONPATH=lib/src
-EXPOSE 5000
+EXPOSE 8888 8888
 CMD /bin/bash
